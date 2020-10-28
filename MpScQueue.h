@@ -12,7 +12,6 @@ using std::endl;
 #define PAGE_SIZE 4096
 #define CACHE_LINE_SIZE 64
 #define NODE_SIZE 1620
-//#define NODE_SIZE 1496
 static inline void * my_align_malloc(size_t align, size_t size)
 {
 	void * ptr;
@@ -36,12 +35,12 @@ static inline void  my_align_free(void * ptr)
 }
 
 
-enum State { empty, set, handled}; // enum  is int we want somthing smaller as char
+enum State { empty, set, handled}; // enum  is int we want something smaller as char
 template <class T>
 class MpScQueue {
 	// LINUX
 private:
-//public:
+
 
 	class Node {
 	public:
@@ -74,8 +73,8 @@ private:
 		
 		std::atomic<bufferList*> next alignas(CACHE_LINE_SIZE);
 		bufferList* prev  alignas(CACHE_LINE_SIZE);
-		unsigned int head; // we have onr thread that takes out elelemts and it is the only one that moves the head 
-		unsigned int positionInQueue; // start with 1 ( because i am using multiplication)
+		unsigned int head; // we have one thread that takes out elelemts and it is the only one that moves the head 
+		unsigned int positionInQueue; // start with 1
 
 		bufferList()
 			: next(NULL), prev(NULL), head(0), positionInQueue(0)
@@ -96,7 +95,7 @@ private:
 
 	};
 
-	bufferList* headOfQueue; //the first array that contains data for the thread that takes elements from the queue (for the single consumer					
+	bufferList* headOfQueue; //the first array that contains data for the thread that takes elements from the queue (for the single consumer)					
 	std::atomic<bufferList*> tailOfQueue alignas(CACHE_LINE_SIZE);// the beginning of the last array which we insert elements into (for the producers)
 	unsigned int bufferSize;
 	std::atomic<uint_fast64_t> gTail alignas(CACHE_LINE_SIZE);// we need a global tail so the queue will be wait free - if not the queue is look free
@@ -141,7 +140,7 @@ public:
 			unsigned int prevSize = bufferSize*(tempTail->positionInQueue - 1);
 			if ((headOfQueue == tailOfQueue.load(std::memory_order_acquire)) && (headOfQueue->head == (gTail.load(std::memory_order_acquire) - prevSize) ))  // the queue is empty
 			{
-				//cout << "empty" << endl;
+				//empty
 				return false;
 			}
 			else if (headOfQueue->head < bufferSize) // there is elements in the current array.
@@ -151,7 +150,7 @@ public:
 				{
 					headOfQueue->head++;
           continue;
-          cout << "handeld" << endl;
+         // handeld
 				}
 
 				bufferList* tempHeadOfQueue = headOfQueue;
@@ -160,7 +159,7 @@ public:
 
 				while (n->is_set.load(std::memory_order_acquire) == 0) // is not set yet - try to take out set elements that are next in line
 				{
-					//cout << "taking elements out after the first element" << endl;
+					
 				
 					if (tempHead  < bufferSize) // there is elements in the current array.
 					{
@@ -170,7 +169,6 @@ public:
 
 							//************* scan****************************
 							bufferList* scanHeadOfQueue = headOfQueue;
-							// we want to scan until one before tn 
 							for (unsigned int scanHead = scanHeadOfQueue->head; ( scanHeadOfQueue != tempHeadOfQueue || scanHead < (tempHead-1) && n->is_set.load(std::memory_order_acquire) == 0); scanHead++)
 							{
 								if (scanHead >= bufferSize)   // we reach the end of the buffer -move to the next
@@ -180,13 +178,13 @@ public:
 									continue;
 								}
 								Node* scanN = &(scanHeadOfQueue->currbuffer[scanHead]);
-								if (scanN->is_set.load(std::memory_order_acquire) == 1) // there is anther element that is set - the scan start again until him
+								if (scanN->is_set.load(std::memory_order_acquire) == 1) // there is another element that is set - the scan start again until him
 								{
 									// this is the new item to be evicted
 									tempHead = scanHead;
 									tempHeadOfQueue = scanHeadOfQueue;
 									tn = scanN;
-									//tn_is_set = tn->is_set.load(std::memory_order_acquire);
+									
 									
 									scanHeadOfQueue = headOfQueue;
 									scanHead = scanHeadOfQueue->head;
@@ -205,13 +203,13 @@ public:
 							{
 								tempHeadOfQueue->head++;
 							}
-							//	cout << "realy taking" << endl;
+							
 							return true;
 
 						}// the data is valid and the element in the head is still in insert process 
 					
 						 if(tn->is_set.load(std::memory_order_acquire) ==0)
-						{ // tn->is_set.load(std::memory_order_acquire) == 0 empty 
+						{ 
 							flag_buffer_all_handeld = false ;
 						}
 						
@@ -229,7 +227,7 @@ public:
 							next->prev = prev;
 							prev->next.store(next, std::memory_order_release);
 							my_align_free(tempHeadOfQueue);
-							//delete tempHeadOfQueue;
+							
 							tempHeadOfQueue = next;
 							tempHead = tempHeadOfQueue->head;
 							flag_buffer_all_handeld = true;
@@ -243,7 +241,7 @@ public:
 							tempHead = tempHeadOfQueue->head;
 							flag_moveToNewBuffer = true;
 							flag_buffer_all_handeld = true;
-							//cout << "going trough elements in queue " << endl;
+							
 						}
 					}
 
@@ -267,18 +265,16 @@ public:
 																							  //	headOfArray->currbuffer = NULL;
 				bufferList* next = headOfQueue->next.load(std::memory_order_acquire);
 				if (next == NULL) return false; // if we do not have where to move 
-			//	cout << "^^^^^dequeue delete old  " << endl;
 				my_align_free(headOfQueue);
-				//delete headOfQueue;
 				headOfQueue = next;
-				//head = 0;
+				
 			}
 		}
 	}
 
 	void enqueue(T const& data)// to put in an element
 	{
-		//bool did_fetch_add = false;
+		
 		bufferList* tempTail;
 		unsigned int location = gTail.fetch_add(1, std::memory_order_seq_cst);
 		bool go_back = false;
@@ -289,7 +285,7 @@ public:
 			
 			unsigned int prevSize = bufferSize*(tempTail->positionInQueue-1); // the amount of items in the queue without the current buffer
 
-			while (location <prevSize) // the location is back in the queue - we need to go to back in the queue to the right buffer
+			while (location <prevSize) // the location is back in the queue - we need to go back in the queue to the right buffer
 			{
 				go_back = true;
 				tempTail = tempTail->prev;
@@ -305,7 +301,6 @@ public:
 				Node* n = &(tempTail->currbuffer[index]);
 					n->data = data;
 					n->is_set.store(1, std::memory_order_relaxed);// need this to signal the thread that the data is ready 
-				//	n->is_set.store(1, std::memory_order_seq_cst);// need this to signal the thread that the data is ready 
 					if (index == 1 && !go_back) // allocating a new buffer and adding it to the queue
 					{
 						void* buffer = my_align_malloc(PAGE_SIZE, sizeof(bufferList));
@@ -324,7 +319,7 @@ public:
 			if (location >= globalSize) // the location we got is in the next buffer  
 			{
 				bufferList* next = (tempTail->next).load(std::memory_order_acquire);
-				if (next == NULL) // we do not have yet a next buffer - so we can try to allocate a new one
+				if (next == NULL) // we do not have a next buffer - so we can try to allocate a new one
 				{
 
 					void* buffer = my_align_malloc(PAGE_SIZE, sizeof(bufferList));
@@ -338,7 +333,7 @@ public:
 						else
 						{
 							my_align_free(newArr);
-							//delete  newArr; // if several threads try simultaneously and the cas fail one succeed - delete the rest 
+							 // if several threads try simultaneously and the cas fail one succeed - delete the rest 
 						}
 					
 				}
